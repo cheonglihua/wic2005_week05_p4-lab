@@ -1,0 +1,35 @@
+C5: Mixed rollout, s1 new and s2 old
+
+Prediction before sending: old s2 would parse the first four tunnel bytes, read proto_id=0x0800 and dst_id=2 correctly, but treat the new hop_limit byte as the first byte of IPv4. It would forward by dst_id, but the packet would have corrupted IPv4/UDP alignment at h2. The loop would not be protected by old s2 because it has no hop-limit logic.
+
+$ python3 topo.py --id 4903 --s2-program tunnel_v1.p4
+Mixed rollout: s1 runs tunnel.p4, s2 runs tunnel_v1.p4
+
+$ h2 timeout 8 tcpdump -c 1 -XX -ni h2-eth0 ether proto 0x1212 > logs/h2cap.txt 2>&1 &
+$ h1 python3 send.py 10.3.0.3 "mixed" --tunnel 2 --hops 2
+Sent from h1-eth0.
+
+$ sh cat logs/h2.txt logs/h3.txt logs/h2cap.txt
+Listening on h2-eth0...
+Listening on h3-eth0...
+16:29:10.072493 00:00:00:00:00:01 > ff:ff:ff:ff:ff:ff, ethertype Unknown (0x1212), length 52:
+        0x0000:  ffff ffff ffff 0000 0000 0001 1212 0800
+        0x0010:  0002 0145 0000 2100 0100 0040 1366 c20a
+        0x0020:  0300 010a 0300 0310 e110 e100 0d80 396d
+        0x0030:  6978 6564
+1 packet captured
+
+h2 did not print a decoded UDP packet. The raw frame shows the old four-byte tunnel header `0800 0002`, followed by the extra hop byte `01` before the IPv4 bytes `45 00 ...`. Old s2 forwarded using dst_id=2 but reconstructed a malformed payload.
+
+For the loop, s2 handle 2 was changed to port 1:
+$ sh ./p4cli s2 "table_modify MyIngress.myTunnel_exact MyIngress.myTunnel_forward 2 1"
+Done
+$ h1 python3 send.py 10.3.0.3 "mixed-loop" --tunnel 3 --hops 2
+Sent from h1-eth0.
+$ sh grep -c "Processing packet received" logs/s1.txt logs/s2.txt
+logs/s1.txt:3
+logs/s2.txt:2
+
+The loop stopped after s1 processed three packets and s2 processed two. s1 decremented the byte it interpreted as hop_limit; old s2 did not decrement it. The packet returned to s1 with a zero limit and was dropped there, so this is not a safe mixed rollout even though this particular byte layout eventually stopped.
+
+Relevant s2 log values: parser start key `1212`, parse_myTunnel key `0800`, and tunnel table keys for the loop were `dst_id=3` with a table hit. The old parser never understood the new field; it consumed the new packet's hop byte as the first byte of its IPv4 header.

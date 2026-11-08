@@ -59,15 +59,56 @@ returned to s1 and dropped. This matches the design exactly.
 
 ## 5. Evaluation
 
-<!-- a) The mixed rollout (mixed.txt): what did you predict before running s1 with your new
-        program and s2 with tunnel_v1.p4? What actually happened to delivery, and to the loop?
-        Explain every difference from your prediction, byte by byte if you need to.
-     b) Propose a safe way to roll out a header change across a network of switches that can't
-        all be upgraded at once. Compare at least two options (for example a version field, a
-        new EtherType, or ordering fields so old switches still parse them).
-     c) Loop protection in the data plane (this hop limit) versus the control plane (Week 3's
-        check_paths()): what can each catch that the other can't? Why do real networks use both?
-     d) What would this change cost on a hardware switch running at line rate? -->
+Before running the mixed rollout, I predicted that old s2 would parse only its
+original four-byte tunnel header. It would therefore read the new packet's
+`proto_id` and `dst_id` correctly, ignore the extra `hop_limit` byte as part of
+the IPv4 header, and still forward the packet based on `dst_id`. I expected
+the packet to reach h2 with corrupted IPv4/UDP alignment rather than being
+delivered normally. I also expected the loop to become unsafe because old s2
+would not decrement the new hop limit.
+
+My prediction before the mixed rollout was that old s2 would read
+`proto_id=0x0800` and `dst_id=2` correctly, but interpret the new hop-limit
+byte as the first byte of IPv4. That prediction was correct. The packet was
+forwarded toward h2, but h2 did not decode it as UDP. The capture in
+`evidence/mixed.txt` shows old s2's four-byte tunnel header `0800 0002`, then
+the extra byte `01`, followed by the IPv4 bytes beginning `45 00`. Old s2
+therefore forwarded using the right tunnel table key while reconstructing a
+malformed payload.
+
+For the mixed loop, s1 processed 3 packets and old s2 processed 2 before the
+packet returned to s1 with a zero value in the byte that the new program
+interpreted as `hop_limit`. New s1 decremented it, while old s2 did not. The
+loop stopped in this particular run, but only because the byte layout happened
+to preserve a usable value; mixed versions do not provide a reliable protocol
+contract.
+
+A safe rollout option is a new EtherType for the new format. Old switches then
+do not parse the new packet as the old header, and the control plane can avoid
+installing new-format traffic on old paths. A version field is another option:
+both versions can share an EtherType, but every switch must inspect the version
+before choosing the correct header length and behavior. A new EtherType is
+simpler to fail closed; a version field is more flexible but requires old
+switches to be explicitly programmed to recognize and safely reject or pass
+the new version. In either case, deploy parser support first, then enable new
+packets only after all paths support them.
+
+The data-plane hop limit protects individual packets immediately: it can stop
+a forwarding loop even when the control plane is unaware of the loop. It
+cannot prove that the configured network topology is loop-free or repair bad
+table entries. Week 3's control-plane `check_paths()` can detect path or
+configuration loops before traffic is sent and can reject an unsafe topology,
+but it cannot catch a transient runtime table change, parser mismatch, or a
+loop created after the check. Real networks use both because configuration
+validation and per-packet containment cover different failure modes.
+
+On a line-rate hardware switch, the change adds an 8-bit header field, one
+byte of parser/deparser bandwidth, and a small compare, decrement, and
+conditional drop in the ingress pipeline. It may consume a little parser,
+match-action, and metadata resource, but it does not require a new table key.
+The main hardware concern is fitting the extra logic and header width into the
+target's fixed pipeline stages; if it fits, the per-packet cost is constant
+and should not reduce throughput, though it consumes some scarce resources.
 
 ## AI use
 
