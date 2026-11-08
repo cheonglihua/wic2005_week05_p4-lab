@@ -14,12 +14,16 @@ I created the loop by modifying handle 2, the `dst_id=3` entry in
      h1 python3 send.py 10.3.0.3 "loop" --tunnel 3
 
 The counts in `evidence/loop-before.txt` increased from 511 packets on each
-switch to 1,594 on s1 and 1,595 on s2 during the observation period. The loop
-did not stop. `ipv4_forward` decrements the IPv4 TTL, but tunnelled packets use
-`myTunnel_forward`, which does not touch the IPv4 header. Therefore the IPv4
-TTL stays 64 and cannot stop this tunnel loop. If an IPv4 packet did use
-`ipv4_forward`, it would eventually reach zero and be dropped by normal host
-or IPv4 processing, but that is not the path used here.
+switch to 1,594 on s1 and 1,595 on s2 during the observation period,
+confirming that the loop continued without stopping.
+
+The `ipv4_forward` action decrements the IPv4 TTL, but tunnelled packets use
+`myTunnel_forward`, which does not modify the IPv4 header. Therefore, the
+IPv4 TTL remains at 64 and cannot stop the tunnel loop. Even for normal IPv4
+forwarding, the supplied P4 program does not explicitly check whether the TTL
+has reached zero. Since the TTL is an unsigned 8-bit field, decrementing it
+from zero causes it to wrap around to 255. As a result, the existing IPv4
+forwarding logic does not reliably prevent forwarding loops either.
 
 ## 2. Design: the hop limit
 
