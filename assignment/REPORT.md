@@ -1,37 +1,61 @@
 # Week 5 assignment — Put a limit on the tunnel
 
-Student ID (last 4 digits only): **NNNN**
+Student ID (last 4 digits only): **4903**
 
 Write each section in your own words, about your own runs. Quote the evidence files in
 `assignment/evidence/` that support each point. Delete the instructions in `<!-- -->` as you go.
 
 ## 1. Analysis: the loop
 
-<!-- How did you create the tunnel loop (which entry, on which switch, which commands)?
-     What did the switch logs show over time, with numbers from loop-before.txt?
-     Then look at the IPv4 path in tunnel.p4: it decrements the TTL. Does that stop an IPv4
-     loop in this program? Check the code, and explain what happens when TTL reaches 0. -->
+I created the loop by modifying handle 2, the `dst_id=3` entry in
+`MyIngress.myTunnel_exact` on s2, from port 3 to port 1:
+
+     sh ./p4cli s2 "table_modify MyIngress.myTunnel_exact MyIngress.myTunnel_forward 2 1"
+     h1 python3 send.py 10.3.0.3 "loop" --tunnel 3
+
+The counts in `evidence/loop-before.txt` increased from 511 packets on each
+switch to 1,594 on s1 and 1,595 on s2 during the observation period. The loop
+did not stop. `ipv4_forward` decrements the IPv4 TTL, but tunnelled packets use
+`myTunnel_forward`, which does not touch the IPv4 header. Therefore the IPv4
+TTL stays 64 and cannot stop this tunnel loop. If an IPv4 packet did use
+`ipv4_forward`, it would eventually reach zero and be dropped by normal host
+or IPv4 processing, but that is not the path used here.
 
 ## 2. Design: the hop limit
 
-<!-- Your header change and your pipeline change, and the reason for each choice:
-     - the field's size, and where in the header you put it (and why there);
-     - the starting value send.py uses, and how you chose it;
-     - where it's decremented, and what happens when it runs out;
-     - what else had to change for every part of the path to agree (parser, deparser, hosts). -->
+I added an 8-bit `hop_limit` field after `dst_id` in `myTunnel_t`. Eight bits
+allows values from 0 to 255 while keeping the field small; placing it after the
+existing routing fields preserves the meaning of `proto_id` and `dst_id`.
+
+`send.py` starts tunnelled packets with a hop limit of 2 by default and exposes
+the value through `--hops`. Two is sufficient for the normal two-switch path,
+and it makes the loop test easy to observe. `myTunnel_forward` checks the
+field before forwarding. A zero value is dropped; otherwise the action sends
+the packet and decrements the field. The parser extracts the enlarged header,
+the deparser emits it, and both host scripts use the same field order and size.
 
 ## 3. Implementation
 
-<!-- Summarise what you changed in tunnel.p4, send.py and receive.py. The pull request shows
-     the code itself: here, explain anything a reviewer might not see from the diff alone. -->
+In `tunnel.p4`, I added the 8-bit field and changed `myTunnel_forward` so that
+it drops packets whose limit is zero and decrements packets it forwards. The
+existing parser, ingress table, and deparser already handle the tunnel header
+from the lab steps, so no new table key was needed.
+
+In `send.py`, `MyTunnel` now includes `hop_limit`, and `--hops` controls its
+starting value with a range check from 0 through 255. In `receive.py`, the
+same field is parsed and printed so the evidence shows the value at delivery.
+The P4 compiler and Python syntax checks passed before the network tests.
 
 ## 4. Evidence: it works
 
-<!-- Show, with your evidence files:
-     - tunnelled delivery to h2 and h3, and the hop limit the receivers saw (delivery.txt);
-     - plain IPv4 still works (delivery.txt);
-     - the same loop as in section 1 now ends, and after how many passes — does that match
-       your design? (loop-after.txt) -->
+`evidence/delivery.txt` shows tunnelled packets arriving at h2 and h3 with
+`hop_limit=0` and TTL 64. It also shows a successful plain ping to h3 with
+TTL 62, so IPv4 forwarding remains unchanged.
+
+`evidence/loop-after.txt` shows the modified loop stopping after s1 processed
+2 packets and s2 processed 1 packet. The packet was forwarded by s1 with its
+limit reduced from 2 to 1, forwarded by s2 with its limit reduced to 0, then
+returned to s1 and dropped. This matches the design exactly.
 
 ## 5. Evaluation
 
@@ -47,10 +71,11 @@ Write each section in your own words, about your own runs. Quote the evidence fi
 
 ## AI use
 
-<!-- This assignment is Level 3 (Open): AI use is allowed if you declare it. State which tools you
-     used (or "None") and what each did — for example "ChatGPT explained the bmv2 log format;
-     the first draft of the hop-limit check came from Copilot, which I then changed and tested".
-     Be ready to explain any part of your work yourself. -->
+I used GitHub Copilot in VS Code to inspect the starter P4 and Python files,
+explain the BMv2 log and table behavior, draft the hop-limit changes, and help
+organize the report. I reviewed the changes, ran the P4 compiler and Python
+syntax checks, and tested the behavior in Mininet with student ID 4903. The
+evidence files contain the outputs from my own runs.
 
 ## Evidence files
 
