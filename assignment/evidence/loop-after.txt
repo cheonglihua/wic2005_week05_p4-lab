@@ -1,0 +1,15 @@
+C4: The same tunnel loop with hop_limit=2
+
+$ python3 topo.py --id 4903
+$ sh ./p4cli s2 "table_modify MyIngress.myTunnel_exact MyIngress.myTunnel_forward 2 1"
+Done
+Modifying entry 2 for exact match table MyIngress.myTunnel_exact
+
+$ h1 python3 send.py 10.3.0.3 "loop" --tunnel 3 --hops 2
+Sent from h1-eth0.
+
+$ sh grep -c "Processing packet received" logs/s1.txt logs/s2.txt
+logs/s1.txt:2
+logs/s2.txt:1
+
+The packet crossed s1, then s2, then returned to s1 with hop_limit=0 and was dropped. The loop stopped after three switch processing events, matching the design: the initial value 2 permits two forwards, and the next switch drops it.
