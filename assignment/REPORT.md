@@ -112,7 +112,7 @@ and should not reduce throughput, though it consumes some scarce resources.
 
 ## AI use
 
-I used GitHub Copilot in VS Code to inspect the starter P4 and Python files,
+**AI usage level: Level 3 - AI-Assisted.** I used GitHub Copilot in VS Code to inspect the starter P4 and Python files,
 explain the BMv2 log and table behavior, draft the hop-limit changes, and help
 organize the report. I reviewed the changes, ran the P4 compiler and Python
 syntax checks, and tested the behavior in Mininet with student ID 4903. The
