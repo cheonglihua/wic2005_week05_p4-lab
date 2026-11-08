@@ -1,0 +1,26 @@
+C1: Create a tunnel loop with the finished lab program
+
+$ python3 topo.py --id 4903
+$ sh ./p4cli s2 table_dump MyIngress.myTunnel_exact
+...
+Dumping entry 0x2
+Match key:
+* myTunnel.dst_id     : EXACT     0003
+Action entry: MyIngress.myTunnel_forward - 03
+
+$ sh ./p4cli s2 "table_modify MyIngress.myTunnel_exact MyIngress.myTunnel_forward 2 1"
+Done
+Modifying entry 2 for exact match table MyIngress.myTunnel_exact
+
+$ h1 python3 send.py 10.3.0.3 "loop" --tunnel 3
+Sent from h1-eth0.
+
+$ sh grep -c "Processing packet received" logs/s1.txt logs/s2.txt
+logs/s1.txt:511
+logs/s2.txt:511
+
+$ sh sleep 5; grep -c "Processing packet received" logs/s1.txt logs/s2.txt
+logs/s1.txt:1594
+logs/s2.txt:1595
+
+The counts continued increasing, so the loop was stopped with exit.
