@@ -59,14 +59,6 @@ returned to s1 and dropped. This matches the design exactly.
 
 ## 5. Evaluation
 
-Before running the mixed rollout, I predicted that old s2 would parse only its
-original four-byte tunnel header. It would therefore read the new packet's
-`proto_id` and `dst_id` correctly, ignore the extra `hop_limit` byte as part of
-the IPv4 header, and still forward the packet based on `dst_id`. I expected
-the packet to reach h2 with corrupted IPv4/UDP alignment rather than being
-delivered normally. I also expected the loop to become unsafe because old s2
-would not decrement the new hop limit.
-
 My prediction before the mixed rollout was that old s2 would read
 `proto_id=0x0800` and `dst_id=2` correctly, but interpret the new hop-limit
 byte as the first byte of IPv4. That prediction was correct. The packet was
