@@ -17,6 +17,13 @@ The counts in `evidence/loop-before.txt` increased from 511 packets on each
 switch to 1,594 on s1 and 1,595 on s2 during the observation period,
 confirming that the loop continued without stopping.
 
+The two recorded count outputs were:
+
+     logs/s1.txt:511
+     logs/s2.txt:511
+     logs/s1.txt:1594
+     logs/s2.txt:1595
+
 The `ipv4_forward` action decrements the IPv4 TTL, but tunnelled packets use
 `myTunnel_forward`, which does not modify the IPv4 header. Therefore, the
 IPv4 TTL remains at 64 and cannot stop the tunnel loop. Even for normal IPv4
@@ -56,6 +63,15 @@ The P4 compiler and Python syntax checks passed before the network tests.
 `hop_limit=0` and TTL 64. It also shows a successful plain ping to h3 with
 TTL 62, so IPv4 forwarding remains unchanged.
 
+For example, the receiver reported:
+
+     Received (tunnelled, dst_id=2, hop_limit=0) from 10.3.0.1 to 10.3.0.2, TTL 64: 'to h2'
+
+The post-change loop count stopped at:
+
+     logs/s1.txt:2
+     logs/s2.txt:1
+
 `evidence/loop-after.txt` shows the modified loop stopping after s1 processed
 2 packets and s2 processed 1 packet. The packet was forwarded by s1 with its
 limit reduced from 2 to 1, forwarded by s2 with its limit reduced to 0, then
@@ -71,6 +87,10 @@ forwarded toward h2, but h2 did not decode it as UDP. The capture in
 the extra byte `01`, followed by the IPv4 bytes beginning `45 00`. Old s2
 therefore forwarded using the right tunnel table key while reconstructing a
 malformed payload.
+
+The captured bytes included this exact line:
+
+     0x0010:  0002 0145 0000 2100 0100 0040 1366 c20a
 
 For the mixed loop, s1 processed 3 packets and old s2 processed 2 before the
 packet returned to s1 with a zero value in the byte that the new program
