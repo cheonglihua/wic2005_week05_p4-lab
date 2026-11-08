@@ -2,9 +2,6 @@
 
 Student ID (last 4 digits only): **4903**
 
-Write each section in your own words, about your own runs. Quote the evidence files in
-`assignment/evidence/` that support each point. Delete the instructions in `<!-- -->` as you go.
-
 ## 1. Analysis: the loop
 
 I created the loop by modifying handle 2, the `dst_id=3` entry in
@@ -128,7 +125,7 @@ and should not reduce throughput, though it consumes some scarce resources.
 
 ## AI use
 
-**AI usage level: Level 3 - AI-Assisted.** I used GitHub Copilot in VS Code to inspect the starter P4 and Python files,
+**AI usage level: Level 3 (Open).** I used GitHub Copilot in VS Code to inspect the starter P4 and Python files,
 explain the BMv2 log and table behavior, draft the hop-limit changes, and help
 organize the report. I reviewed the changes, ran the P4 compiler and Python
 syntax checks, and tested the behavior in Mininet with student ID 4903. The
@@ -138,7 +135,7 @@ evidence files contain the outputs from my own runs.
 
 | File | What it shows |
 |---|---|
-| `evidence/loop-before.txt` | The loop with your finished lab program: pass counts growing |
+| `evidence/loop-before.txt` | The loop with my completed lab program: pass counts growing |
 | `evidence/delivery.txt` | Tunnelled delivery with the hop limit, and a plain ping |
-| `evidence/loop-after.txt` | The same loop with your hop limit: pass counts that stop |
+| `evidence/loop-after.txt` | The same loop with my hop-limit implementation: pass counts that stop |
 | `evidence/mixed.txt` | The mixed rollout: s1 new, s2 old |
