@@ -37,7 +37,8 @@ existing routing fields preserves the meaning of `proto_id` and `dst_id`.
 
 `send.py` starts tunnelled packets with a hop limit of 2 by default and exposes
 the value through `--hops`. Two is sufficient for the normal two-switch path,
-and it makes the loop test easy to observe. `myTunnel_forward` checks the
+and it makes the loop test easy to observe; in a real network, the starting
+value would be chosen from the expected maximum path length. `myTunnel_forward` checks the
 field before forwarding. A zero value is dropped; otherwise the action sends
 the packet and decrements the field. The parser extracts the enlarged header,
 the deparser emits it, and both host scripts use the same field order and size.
